@@ -1,0 +1,11 @@
+{
+    "folders":
+    [
+        {
+            "folder_exclude_patterns": [".svn", ".git", ".sass-cache","log"],
+            "file_include_patterns": ["*.go","*.md","makefile","*.sh","*.toml","*.pem","*.json"],
+            "follow_symlinks": true,
+            "path": "."
+        }
+    ]   
+}
