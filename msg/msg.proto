@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+message LoginReq {
+    string name = 1;
+    string id = 2;
+}
+
+message LoginRsp{
+    int32 rst = 1;
+    string id = 2;
+}
+
+
+message AliveReq{
+    string id = 1;
+}
+
+message AliveRsp{
+    int32 rst = 1;
+}
+
+
+message LogoutReq {
+    string id = 1;
+}
+
+message LogoutRsp{
+    int32 rst = 1;
+}
+
+// udpsrv send to client
+message NewConnPushReq {
+    int32 connid = 1;
+}
+
+message NewConnPushRsp{
+    int32 rst = 1;
+    int32 connid = 2;
+}
+
+// tcp message send by client
+message NewConnHandShakeReq {
+    int32 connid = 1;
+}
+
+message NewConnHandShakeRsp{
+    int32 rst = 1;
+    int32 connid = 2;
+}

@@ -39,7 +39,7 @@ func Unpack(buff []byte) (cmd int, body []byte, err error) {
 	}
 	if len(buff) == int(msgsize) {
 		phead := (*cmdheader)(unsafe.Pointer(&buff[0]))
-		cmd = phead.cmd
+		cmd = int(phead.cmd)
 		body = buff[unsafe.Sizeof(*phead):]
 		err = nil
 		return
@@ -51,7 +51,7 @@ func Unpack(buff []byte) (cmd int, body []byte, err error) {
 func Pack(cmd int, body []byte) ([]byte, error) {
 	buff := make([]byte, headerSize+len(body))
 	phead := (*cmdheader)(unsafe.Pointer(&buff[0]))
-	phead.cmd = cmd
+	phead.cmd = uint32(cmd)
 	phead.size = uint32(headerSize + len(body))
 
 	copy(buff[headerSize:], body)
