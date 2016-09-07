@@ -12,9 +12,12 @@ import (
 	"time"
 )
 
+func init() {
+	Rand.Seed(time.Now().Unix())
+}
 func GetGuid() (string, error) {
 	buf := [128]byte{}
-	n, err := rand.Read(buf[:])
+	n, err := Reader.Read(buf[:])
 	if n < len(buf) {
 		return "", err
 	}

@@ -20,9 +20,16 @@ type Sender interface {
 
 // Proxys represent proxy run in the client host who behind a nat
 type Proxys struct {
-	lock sync.Mutex
+	lock *sync.Mutex
 
 	proxys *list.List
+}
+
+func New() *Proxys {
+	return &Proxys{
+		&sync.Mutex{},
+		list.New(),
+	}
 }
 
 type proxy struct {
@@ -69,6 +76,8 @@ func (ps *Proxys) DoCmdLoginReq(cmd int, body []byte, sender Sender, recvTime ti
 		}).Warnln("proto unmarshal fail.")
 		return false
 	}
+
+	logrus.WithTryJson(req).Infoln("DoCmdLoginReq")
 
 	ps.lock.Lock()
 
@@ -138,10 +147,13 @@ func (ps *Proxys) DoCmdLoginReq(cmd int, body []byte, sender Sender, recvTime ti
 		}).Warnln("Send fail.")
 		return false
 	}
+	logrus.WithTryJson(rsp).Infoln("DoCmdLoginReq")
+
 	return true
 }
 
 func (ps *Proxys) DoCmdAliveReq(cmd int, body []byte, sender Sender, recvTime time.Time, tarAddr *net.UDPAddr) bool {
+
 	req := &msg.AliveReq{}
 	rsp := &msg.AliveRsp{}
 	rst := msg.FAIL
@@ -157,6 +169,7 @@ func (ps *Proxys) DoCmdAliveReq(cmd int, body []byte, sender Sender, recvTime ti
 		}).Warnln("proto unmarshal fail.")
 		return false
 	}
+	logrus.WithTryJson(req).Infoln("DoCmdAliveReq")
 
 	exist := false
 	ps.lock.Lock()
@@ -188,7 +201,7 @@ func (ps *Proxys) DoCmdAliveReq(cmd int, body []byte, sender Sender, recvTime ti
 		}).Warnln("proto marshal fail.")
 		return false
 	}
-	senddata, packerr := pack.Pack(msg.CMD_LOGIN_RSP, bodydata)
+	senddata, packerr := pack.Pack(msg.CMD_ALIVE_RSP, bodydata)
 	if packerr != nil {
 		logrus.WithFields(logrus.Fields{
 			"cmd":      cmd,
@@ -208,6 +221,7 @@ func (ps *Proxys) DoCmdAliveReq(cmd int, body []byte, sender Sender, recvTime ti
 		}).Warnln("Send fail.")
 		return false
 	}
+	logrus.WithTryJson(rsp).Infoln("DoCmdAliveReq")
 	return true
 }
 

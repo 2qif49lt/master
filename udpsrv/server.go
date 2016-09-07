@@ -105,12 +105,12 @@ func (s *Srv) RunOn(addr string) error {
 }
 
 func (s *Srv) Stop() {
-	if _, ok := <-s.stopchan; !ok {
+	if s.stoped {
 		return
 	}
+
 	close(s.stopchan)
 	s.stoped = true
-	s.lconn.Close()
 }
 
 func (s *Srv) handlemsg() {
