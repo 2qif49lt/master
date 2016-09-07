@@ -1,6 +1,7 @@
 package proxys
 
 import (
+	"container/list"
 	"net"
 	"sync"
 	"time"
@@ -21,12 +22,14 @@ type Sender interface {
 type Proxys struct {
 	lock sync.Mutex
 
-	proxys []proxy
+	proxys *list.List
 }
 
 type proxy struct {
 	name string
 	id   string
+
+	addr *net.UDPAddr
 
 	connid int
 	alive  time.Time
@@ -36,12 +39,17 @@ func (ps *Proxys) CheckAlive() {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
 
-	for k, v := range ps.proxys {
+	for e := ps.proxys.Front(); e != nil; {
+		v := e.Value.(*proxy)
 		if time.Since(v.alive) > time.Second*60 {
 			logrus.WithTryJson(v).Infoln("proxy is time out.")
-			//  ps.proxys = append(ps.proxys[:k],ps.proxys[k+1:])
-			ps.proxys = ps.proxys[:k+copy(ps.proxys[k:], ps.proxys[k+1:])]
+
+			next := e.Next()
+			ps.proxys.Remove(e)
+			e = next
+			continue
 		}
+		e = e.Next()
 	}
 }
 func (ps *Proxys) DoCmdLoginReq(cmd int, body []byte, sender Sender, recvTime time.Time, tarAddr *net.UDPAddr) bool {
@@ -63,12 +71,18 @@ func (ps *Proxys) DoCmdLoginReq(cmd int, body []byte, sender Sender, recvTime ti
 	}
 
 	ps.lock.Lock()
+
 	exist := false
-	for _, v := range ps.proxys {
+	for e := ps.proxys.Front(); e != nil; e = e.Next() {
+		v := e.Value.(*proxy)
 		if v.name == req.Name {
 			exist = true
 			if v.id == req.Id {
-				rst = msg.SUCC
+				if v.addr.String() == tarAddr.String() {
+					rst = msg.SUCC // re-login
+				} else {
+					rst = msg.RST_TRY_LATER // try later
+				}
 			} else {
 				rst = msg.RST_NAME_EXIST
 			}
@@ -80,13 +94,15 @@ func (ps *Proxys) DoCmdLoginReq(cmd int, body []byte, sender Sender, recvTime ti
 		rst = msg.SUCC
 		id, _ = random.GetGuid()
 
-		ps.proxys = append(ps.proxys, proxy{
+		ps.proxys.PushBack(&proxy{
 			req.Name,
 			id,
+			tarAddr,
 			0,
 			time.Now(),
 		})
 	}
+
 	ps.lock.Unlock()
 
 	rsp.Rst = int32(rst)
@@ -120,14 +136,147 @@ func (ps *Proxys) DoCmdLoginReq(cmd int, body []byte, sender Sender, recvTime ti
 			"data len": len(senddata),
 			"error":    err.Error(),
 		}).Warnln("Send fail.")
+		return false
 	}
 	return true
 }
 
-func (srvs *Proxys) DoCmdAliveReq(cmd int, body []byte, sender Sender, recvTime time.Time, tarAddr *net.UDPAddr) bool {
-	return false
+func (ps *Proxys) DoCmdAliveReq(cmd int, body []byte, sender Sender, recvTime time.Time, tarAddr *net.UDPAddr) bool {
+	req := &msg.AliveReq{}
+	rsp := &msg.AliveRsp{}
+	rst := msg.FAIL
+
+	err := proto.Unmarshal(body, req)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":      cmd,
+			"ip":       tarAddr.String(),
+			"time":     recvTime.Unix(),
+			"data len": len(body),
+			"error":    err.Error(),
+		}).Warnln("proto unmarshal fail.")
+		return false
+	}
+
+	exist := false
+	ps.lock.Lock()
+
+	for e := ps.proxys.Front(); e != nil; e = e.Next() {
+		v := e.Value.(*proxy)
+		if v.id == req.Id && v.addr.String() == tarAddr.String() {
+			exist = true
+			v.alive = time.Now()
+			rst = msg.SUCC
+			break
+		}
+	}
+
+	ps.lock.Unlock()
+
+	if exist == false {
+		rst = msg.RST_GO_LOGIN
+	}
+
+	rsp.Rst = int32(rst)
+
+	bodydata, marshalerr := proto.Marshal(rsp)
+	if marshalerr != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":   cmd,
+			"ip":    tarAddr.String(),
+			"error": marshalerr.Error(),
+		}).Warnln("proto marshal fail.")
+		return false
+	}
+	senddata, packerr := pack.Pack(msg.CMD_LOGIN_RSP, bodydata)
+	if packerr != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":      cmd,
+			"ip":       tarAddr.String(),
+			"data len": len(bodydata),
+			"error":    packerr.Error(),
+		}).Warnln("Pack fail.")
+		return false
+	}
+	err = sender.Send(senddata, tarAddr)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":      cmd,
+			"ip":       tarAddr.String(),
+			"data len": len(senddata),
+			"error":    err.Error(),
+		}).Warnln("Send fail.")
+		return false
+	}
+	return true
 }
 
-func (srvs *Proxys) DoCmdLogoutReq(cmd int, body []byte, sender Sender, recvTime time.Time, tarAddr *net.UDPAddr) bool {
-	return false
+func (ps *Proxys) DoCmdLogoutReq(cmd int, body []byte, sender Sender, recvTime time.Time, tarAddr *net.UDPAddr) bool {
+	req := &msg.LogoutReq{}
+	rsp := &msg.LogoutRsp{}
+	rst := msg.FAIL
+
+	err := proto.Unmarshal(body, req)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":      cmd,
+			"ip":       tarAddr.String(),
+			"time":     recvTime.Unix(),
+			"data len": len(body),
+			"error":    err.Error(),
+		}).Warnln("proto unmarshal fail.")
+		return false
+	}
+
+	exist := false
+	ps.lock.Lock()
+
+	for e := ps.proxys.Front(); e != nil; e = e.Next() {
+		v := e.Value.(*proxy)
+		if v.id == req.Id && v.addr.String() == tarAddr.String() {
+			exist = true
+			rst = msg.SUCC
+
+			ps.proxys.Remove(e)
+			break
+		}
+	}
+	ps.lock.Unlock()
+
+	if exist == false {
+		rst = msg.RST_NO_EXIST
+	}
+
+	rsp.Rst = int32(rst)
+
+	bodydata, marshalerr := proto.Marshal(rsp)
+	if marshalerr != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":   cmd,
+			"ip":    tarAddr.String(),
+			"error": marshalerr.Error(),
+		}).Warnln("proto marshal fail.")
+		return false
+	}
+	senddata, packerr := pack.Pack(msg.CMD_LOGIN_RSP, bodydata)
+	if packerr != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":      cmd,
+			"ip":       tarAddr.String(),
+			"data len": len(bodydata),
+			"error":    packerr.Error(),
+		}).Warnln("Pack fail.")
+		return false
+	}
+	err = sender.Send(senddata, tarAddr)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":      cmd,
+			"ip":       tarAddr.String(),
+			"data len": len(senddata),
+			"error":    err.Error(),
+		}).Warnln("Send fail.")
+		return false
+	}
+	return true
 }

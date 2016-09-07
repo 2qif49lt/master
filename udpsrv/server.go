@@ -118,8 +118,8 @@ func (s *Srv) handlemsg() {
 		select {
 		case <-s.stopchan:
 			break
-		case inmsg := <-s.recvqueue:
-			if s.handler != nil {
+		case inmsg, ok := <-s.recvqueue:
+			if ok && s.handler != nil {
 				s.handler.Handle(inmsg, s)
 			}
 		}
@@ -130,8 +130,10 @@ func (s *Srv) sendmsg() {
 		select {
 		case <-s.stopchan:
 			break
-		case inmsg := <-s.sendqueue:
-			s.lconn.WriteToUDP(inmsg.data, inmsg.remoteAddr)
+		case inmsg, ok := <-s.sendqueue:
+			if ok {
+				s.lconn.WriteToUDP(inmsg.data, inmsg.remoteAddr)
+			}
 		}
 	}
 }

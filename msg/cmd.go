@@ -18,8 +18,13 @@ const (
 )
 
 const (
-	SUCC = iota
-	FAIL
+	SUCC = 0
+	FAIL = 1
+)
 
-	RST_NAME_EXIST
+const (
+	RST_NAME_EXIST = 1000 + iota
+	RST_GO_LOGIN
+	RST_NO_EXIST
+	RST_TRY_LATER
 )
