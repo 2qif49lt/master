@@ -2,6 +2,7 @@ package proxys
 
 import (
 	"container/list"
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -38,10 +39,49 @@ type proxy struct {
 
 	addr *net.UDPAddr
 
-	connid int
-	alive  time.Time
+	conns map[string]proxyconn
+	alive time.Time
 }
 
+type proxyconn struct {
+}
+
+func (ps *Proxys) SendNewConnPushReqWithAutoRandId(name, srvAddr string, sender Sender) error {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+
+	for e := ps.proxys.Front(); e != nil; e = e.Next() {
+		v := e.Value.(*proxy)
+
+		if v.name == name {
+			connid, _ := random.GetGuid()
+			v.conns[connid] = proxyconn{}
+
+			return v.sendNewConnPushReq(connid, srvAddr, sender)
+		}
+	}
+	return fmt.Errorf("not found")
+}
+func (p *proxy) sendNewConnPushReq(connid, srvAddr string, sender Sender) error {
+	req := &msg.NewConnPushReq{}
+	req.Connid = connid
+	req.Srvaddr = srvAddr
+
+	bodydata, marshalerr := proto.Marshal(req)
+	if marshalerr != nil {
+		return marshalerr
+	}
+
+	senddata, packerr := pack.Pack(msg.CMD_NEW_CONN_PUSH_REQ, bodydata)
+	if packerr != nil {
+		return packerr
+	}
+	err := sender.Send(senddata, p.addr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (ps *Proxys) CheckAlive() {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
@@ -107,7 +147,7 @@ func (ps *Proxys) DoCmdLoginReq(cmd int, body []byte, sender Sender, recvTime ti
 			req.Name,
 			id,
 			tarAddr,
-			0,
+			make(map[string]proxyconn),
 			time.Now(),
 		})
 	}
@@ -294,3 +334,74 @@ func (ps *Proxys) DoCmdLogoutReq(cmd int, body []byte, sender Sender, recvTime t
 	}
 	return true
 }
+
+/*
+func (ps *Proxys) DoCmdNewConnPushRsp(cmd int, body []byte, sender Sender, recvTime time.Time, tarAddr *net.UDPAddr) bool {
+	rsp := &msg.NewConnPushRsp{}
+	rst := msg.FAIL
+
+	err := proto.Unmarshal(body, rsp)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":      cmd,
+			"ip":       tarAddr.String(),
+			"time":     recvTime.Unix(),
+			"data len": len(body),
+			"error":    err.Error(),
+		}).Warnln("proto unmarshal fail.")
+		return false
+	}
+
+	exist := false
+	ps.lock.Lock()
+
+	for e := ps.proxys.Front(); e != nil; e = e.Next() {
+		v := e.Value.(*proxy)
+		if v.id == req.Id && v.addr.String() == tarAddr.String() {
+			exist = true
+			rst = msg.SUCC
+
+			ps.proxys.Remove(e)
+			break
+		}
+	}
+	ps.lock.Unlock()
+
+	if exist == false {
+		rst = msg.RST_NO_EXIST
+	}
+
+	rsp.Rst = int32(rst)
+
+	bodydata, marshalerr := proto.Marshal(rsp)
+	if marshalerr != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":   cmd,
+			"ip":    tarAddr.String(),
+			"error": marshalerr.Error(),
+		}).Warnln("proto marshal fail.")
+		return false
+	}
+	senddata, packerr := pack.Pack(msg.CMD_LOGIN_RSP, bodydata)
+	if packerr != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":      cmd,
+			"ip":       tarAddr.String(),
+			"data len": len(bodydata),
+			"error":    packerr.Error(),
+		}).Warnln("Pack fail.")
+		return false
+	}
+	err = sender.Send(senddata, tarAddr)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":      cmd,
+			"ip":       tarAddr.String(),
+			"data len": len(senddata),
+			"error":    err.Error(),
+		}).Warnln("Send fail.")
+		return false
+	}
+	return true
+}
+*/

@@ -30,20 +30,14 @@ message LogoutRsp{
 
 // udpsrv send to client
 message NewConnPushReq {
-    int32 connid = 1;
+    string connid = 1;
+    string srvaddr = 2;
 }
 
-message NewConnPushRsp{
-    int32 rst = 1;
-    int32 connid = 2;
-}
 
 // tcp message send by client
-message NewConnHandShakeReq {
-    int32 connid = 1;
+message NewConnPushRsp {
+    string id = 1;
+    string connid = 2;
 }
 
-message NewConnHandShakeRsp{
-    int32 rst = 1;
-    int32 connid = 2;
-}

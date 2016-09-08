@@ -27,6 +27,9 @@ func (c *Client) handler(data []byte, tarAddr *net.UDPAddr) error {
 		return c.handleAliveRsp(cmd, body, tarAddr)
 	case msg.CMD_LOGOUT_RSP:
 		return c.handleLogoutRsp(cmd, body, tarAddr)
+	case msg.CMD_NEW_CONN_PUSH_REQ:
+		return c.handleNewConnPushReq(cmd, body, tarAddr)
+
 	default:
 		return fmt.Errorf("cmd: %d donot support", cmd)
 	}
@@ -171,6 +174,25 @@ func (c *Client) handleLogoutRsp(cmd int, body []byte, tarAddr *net.UDPAddr) err
 		c.status = status_logouted
 		c.lock.Unlock()
 	}
+
+	return nil
+}
+
+func (c *Client) handleNewConnPushReq(cmd int, body []byte, tarAddr *net.UDPAddr) error {
+	req := &msg.NewConnPushReq{}
+
+	err := proto.Unmarshal(body, req)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"cmd":      cmd,
+			"ip":       tarAddr.String(),
+			"data len": len(body),
+			"error":    err.Error(),
+		}).Warnln("proto unmarshal fail.")
+		return err
+	}
+
+	logrus.WithTryJson(req).Infoln("handleNewConnPushReq")
 
 	return nil
 }
