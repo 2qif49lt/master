@@ -21,16 +21,22 @@ type Sender interface {
 
 // Proxys represent proxy run in the client host who behind a nat
 type Proxys struct {
-	lock *sync.Mutex
+	Udpsender Sender
+	lock      *sync.Mutex
 
 	proxys *list.List
 }
 
 func New() *Proxys {
 	return &Proxys{
+		nil,
 		&sync.Mutex{},
 		list.New(),
 	}
+}
+
+func (ps *Proxys) SetSender(sender Sender) {
+	ps.Udpsender = sender
 }
 
 type proxy struct {
@@ -44,9 +50,27 @@ type proxy struct {
 }
 
 type proxyconn struct {
+	reqTime time.Time
 }
 
-func (ps *Proxys) SendNewConnPushReqWithAutoRandId(name, srvAddr string, sender Sender) error {
+func (ps *Proxys) CheckNewConnPushRsp(id, connid string) error {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+
+	for e := ps.proxys.Front(); e != nil; e = e.Next() {
+		pr := e.Value.(*proxy)
+
+		if pr.id == id {
+			if pc, ok := pr.conns[connid]; ok {
+				fmt.Println(pc)
+				return nil
+			}
+
+		}
+	}
+	return fmt.Errorf("not found")
+}
+func (ps *Proxys) SendNewConnPushReqWithAutoRandId(name, srvAddr string) error {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
 
@@ -55,9 +79,9 @@ func (ps *Proxys) SendNewConnPushReqWithAutoRandId(name, srvAddr string, sender 
 
 		if v.name == name {
 			connid, _ := random.GetGuid()
-			v.conns[connid] = proxyconn{}
+			v.conns[connid] = proxyconn{time.Now()}
 
-			return v.sendNewConnPushReq(connid, srvAddr, sender)
+			return v.sendNewConnPushReq(connid, srvAddr, ps.Udpsender)
 		}
 	}
 	return fmt.Errorf("not found")

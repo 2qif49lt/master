@@ -10,7 +10,7 @@ type Sender interface {
 }
 
 type Handler interface {
-	Handle(inmsg *inQueueMsg, sender Sender) bool
+	Handle(inmsg *InQueueMsg, sender Sender) bool
 }
 
 // SetHander should be call before run
@@ -21,6 +21,6 @@ func (srv *Srv) SetHander(handle Handler) {
 type defHandler struct {
 }
 
-func (def *defHandler) Handle(inmsg *inQueueMsg, sender Sender) bool {
+func (def *defHandler) Handle(inmsg *InQueueMsg, sender Sender) bool {
 	return sender.Send(inmsg.data, inmsg.remoteAddr) == nil
 }

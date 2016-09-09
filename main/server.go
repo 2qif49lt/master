@@ -9,8 +9,10 @@ import (
 
 func main() {
 	srv := udpsrv.New()
-	srv.SetHander(&udpsrv.MsgHandler{proxys.New()})
-	go httpsrv.Run(":8080")
+	ps := proxys.New()
+	ps.Udpsender = srv
+	srv.SetHander(&udpsrv.MsgHandler{ps})
+	go httpsrv.RunOn(":8080", ps, ":7898")
 	err := srv.RunOn(":8898")
 	fmt.Println(err)
 

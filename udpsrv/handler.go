@@ -11,7 +11,7 @@ type MsgHandler struct {
 	Pxys *proxys.Proxys
 }
 
-func (hder *MsgHandler) Handle(inmsg *inQueueMsg, sender Sender) bool {
+func (hder *MsgHandler) Handle(inmsg *InQueueMsg, sender Sender) bool {
 	cmd, body, err := pack.Unpack(inmsg.data)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{

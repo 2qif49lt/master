@@ -31,7 +31,8 @@ message LogoutRsp{
 // udpsrv send to client
 message NewConnPushReq {
     string connid = 1;
-    string srvaddr = 2;
+    int32 locport = 2;
+    string srvaddr = 3;
 }
 
 

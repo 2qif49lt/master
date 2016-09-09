@@ -23,13 +23,13 @@ type Srv struct {
 	lconn    *net.UDPConn
 	stoped   bool
 
-	sendqueue chan *inQueueMsg
-	recvqueue chan *inQueueMsg
+	sendqueue chan *InQueueMsg
+	recvqueue chan *InQueueMsg
 
 	handler Handler
 }
 
-type inQueueMsg struct {
+type InQueueMsg struct {
 	putTime    time.Time
 	remoteAddr *net.UDPAddr
 	data       []byte
@@ -39,7 +39,7 @@ func (srv *Srv) Send(msg []byte, tarAddr *net.UDPAddr) error {
 	if msg == nil {
 		return fmt.Errorf("msg is nil")
 	}
-	packet := &inQueueMsg{}
+	packet := &InQueueMsg{}
 
 	packet.putTime = time.Now()
 	packet.remoteAddr = tarAddr
@@ -59,8 +59,8 @@ func New() *Srv {
 		nil,
 		false,
 
-		make(chan *inQueueMsg, defaultMaxQueueSize),
-		make(chan *inQueueMsg, defaultMaxQueueSize),
+		make(chan *InQueueMsg, defaultMaxQueueSize),
+		make(chan *InQueueMsg, defaultMaxQueueSize),
 
 		&defHandler{},
 	}
@@ -73,7 +73,7 @@ func (s *Srv) run() {
 
 		n, remoteAddr, err := s.lconn.ReadFromUDP(data)
 		if err == nil {
-			msg := &inQueueMsg{}
+			msg := &InQueueMsg{}
 
 			msg.putTime = time.Now()
 			msg.remoteAddr = remoteAddr

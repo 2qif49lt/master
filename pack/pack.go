@@ -12,9 +12,28 @@ const (
 	sizeFieldSize = 4
 	// sizeFieldPos size字段在包头的位置
 	sizeFieldPos = 0
-	// sizeHeader 协议包包头长度
-	headerSize = 16
 )
+
+var (
+	// sizeHeader 协议包包头长度
+	headerSize = int(unsafe.Sizeof(cmdheader{}))
+)
+
+func HeadSize() int {
+	return headerSize
+}
+
+func UnpackHead(buff []byte) (cmd, bodyLen int, err error) {
+	if len(buff) != headerSize {
+		err = ErrHeaderWrong
+		return
+	}
+	phead := (*cmdheader)(unsafe.Pointer(&buff[0]))
+	cmd = int(phead.cmd)
+	bodyLen = int(phead.size) - headerSize
+	err = nil
+	return
+}
 
 type cmdheader struct {
 	size uint32
@@ -24,6 +43,7 @@ type cmdheader struct {
 }
 
 var (
+	ErrHeaderWrong  = errors.New("头解析出错")
 	ErrPacketBroken = errors.New("包不完整")
 	ErrSizeInvalid  = errors.New("头部大小错误") // 头部大小错误
 )
