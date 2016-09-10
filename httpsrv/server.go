@@ -1,14 +1,18 @@
 package httpsrv
 
 import (
-	"bytes"
+	//	"bytes"
+	"context"
 	"fmt"
-	"io/ioutil"
+	//	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"strconv"
 	"strings"
+	"time"
 
+	//	"github.com/2qif49lt/logrus"
 	"github.com/2qif49lt/master/proxys"
 )
 
@@ -53,8 +57,35 @@ type handler struct {
 	tcpAddr string
 }
 
+func (h *handler) waitForReverseConnection(ctx context.Context, name, connid string) (*net.TCPConn, error) {
+	cliChan, err := h.ps.GetProxyReverseConnChan(name, connid)
+	if err != nil {
+		return nil, err
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("wait cancel")
+	case <-time.After(time.Second * 30):
+		return nil, fmt.Errorf("wait timeout")
+	case cliConn, ok := <-cliChan:
+		if ok == false {
+			return nil, fmt.Errorf("proxy client wait channel closed")
+		}
+		return cliConn, nil
+	}
+}
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	n, p, s, e := checkUri(r.RequestURI)
+	if strings.Contains(r.RequestURI, "/favicon.ico") {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	rProxy := &httputil.ReverseProxy{}
+	rProxy.Director = func(r *http.Request) {
+		// already done outside
+	}
+	r.URL.Scheme = "http"
+	name, port, s, e := checkUri(r.RequestURI)
 	if e != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(e.Error()))
@@ -64,28 +95,34 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s == "" {
 		s = "/"
 	}
-	fmt.Println(n, p, s, e)
+	fmt.Println(name, port, s, e)
 
-	buf := bytes.NewBuffer(nil)
 	r.Host = "127.0.0.1"
-	if p != 80 {
-		r.Host = fmt.Sprintf("127.0.0.1:%d", p)
+	if port != 80 {
+		r.Host = fmt.Sprintf("127.0.0.1:%d", port)
 	}
+	r.URL.Host = r.Host
 	r.URL.Path = s
-	e = r.Write(buf)
+
+	connid, e := h.ps.SendNewConnPushReqWithAutoRandId(name, h.tcpAddr, port)
 	if e != nil {
-		fmt.Println(e)
+		fmt.Println(e, connid)
+		w.Write([]byte(e.Error()))
 		return
 	}
 
-	srcdata, e := ioutil.ReadAll(buf)
-	if e != nil {
-		fmt.Println(e)
-		return
+	rProxy.Transport = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return h.waitForReverseConnection(ctx, name, connid)
+		},
+		MaxIdleConns:          10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
 	}
+	rProxy.ServeHTTP(w, r)
 
-	w.Write(srcdata)
-	h.ps.SendNewConnPushReqWithAutoRandId(n, h.tcpAddr)
 }
 
 func RunOn(addr string, ps *proxys.Proxys, tcpAddr string) error {

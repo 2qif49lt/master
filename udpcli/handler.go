@@ -7,6 +7,7 @@ import (
 	"github.com/2qif49lt/logrus"
 	"github.com/2qif49lt/master/msg"
 	"github.com/2qif49lt/master/pack"
+	tcpclient "github.com/2qif49lt/master/tcp/client"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -194,5 +195,12 @@ func (c *Client) handleNewConnPushReq(cmd int, body []byte, tarAddr *net.UDPAddr
 
 	logrus.WithTryJson(req).Infoln("handleNewConnPushReq")
 
+	tcpcli := &tcpclient.ClientConn{}
+	tcpcli.Id = c.Id
+	tcpcli.ConnId = req.Connid
+	tcpcli.LocalPort = int(req.Locport)
+	tcpcli.SrvAddr = req.Srvaddr
+
+	go tcpcli.DoProxy()
 	return nil
 }

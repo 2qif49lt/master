@@ -33,6 +33,7 @@ type Client struct {
 	Id   string
 
 	lock *sync.RWMutex // protect status name,id
+
 }
 
 func New() *Client {

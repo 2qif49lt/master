@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/2qif49lt/logrus"
 	"github.com/2qif49lt/master/msg"
@@ -28,10 +29,14 @@ func (srv *Srv) RunOn(addr string) error {
 	if err != nil {
 		return err
 	}
+	stopChan := make(chan struct{})
+	defer close(stopChan)
+	go srv.ps.CheckAlive(stopChan)
+
 	var tempDelay time.Duration
 	defer lis.Close()
 	for {
-		rw, e := lis.Accept()
+		rw, e := lis.AcceptTCP()
 		if e != nil {
 			if ne, ok := e.(net.Error); ok && ne.Temporary() {
 				if tempDelay == 0 {
@@ -50,26 +55,39 @@ func (srv *Srv) RunOn(addr string) error {
 		}
 		tempDelay = 0
 		c := srv.newConn(rw)
-		go c.serve(ctx)
+		go c.serve()
 	}
 }
 
 type Conn struct {
 	srv    *Srv
-	conn   net.Conn
+	conn   *net.TCPConn
 	id     string
 	connid string
 }
 
-func (srv *Srv) newConn(rw net.Conn) *Conn {
-	c := &Conn{srv, rw}
+func (srv *Srv) newConn(conn *net.TCPConn) *Conn {
+	c := &Conn{
+		srv:  srv,
+		conn: conn,
+	}
 	return c
 }
 
 func (c *Conn) serve() {
+	err := c.readAndServeNewConnPushRsp()
+	if err != nil {
+		logrus.Errorln(err)
+		c.conn.Close()
 
-	for {
+		return
+	}
+	err = c.srv.ps.PushProxyReverseConnChan(c.id, c.connid, c.conn)
+	if err != nil {
+		logrus.Errorln(err)
+		c.conn.Close()
 
+		return
 	}
 }
 
@@ -113,7 +131,7 @@ func (c *Conn) readAndServeNewConnPushRsp() error {
 	if err != nil {
 		return err
 	}
-
+	logrus.WithTryJson(rsp).Infoln("readAndServeNewConnPushRsp")
 	err = c.srv.ps.CheckNewConnPushRsp(rsp.Id, rsp.Connid)
 	if err != nil {
 		return err
