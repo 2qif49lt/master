@@ -69,7 +69,7 @@ func (h *handler) waitForReverseConnection(ctx context.Context, name, connid str
 	select {
 	case <-ctx.Done():
 		return nil, fmt.Errorf("wait cancel")
-	case <-time.After(time.Second * 30):
+	case <-time.After(time.Second * 60):
 		return nil, fmt.Errorf("wait timeout")
 	case cliConn, ok := <-cliChan:
 		if ok == false {
