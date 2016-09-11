@@ -7,7 +7,7 @@ import (
 	//	"io/ioutil"
 	"net"
 	"net/http"
-	//	"net/http/httputil"
+	"net/http/httputil"
 	"net/url"
 	"path"
 	"strconv"
@@ -86,19 +86,14 @@ func checkSubDomain(host string) string {
 	return arr[0]
 }
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("req uri", r.RequestURI)
-
-	fmt.Printf("%#v\n", r.URL)
-
 	subDomain := checkSubDomain(r.Host)
 	if subDomain == "" {
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
-	rProxy := &ReverseProxy{}
+	rProxy := &httputil.ReverseProxy{}
 	rProxy.Director = func(r *http.Request) {
-		// already done outside
 		r.URL.Scheme = "http"
 		r.Host = "127.0.0.1"
 		r.URL.Host = r.Host

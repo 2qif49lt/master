@@ -200,6 +200,9 @@ func (c *Client) handleNewConnPushReq(cmd int, body []byte, tarAddr *net.UDPAddr
 	tcpcli.ConnId = req.Connid
 	tcpcli.LocalPort = int(req.Locport)
 	tcpcli.SrvAddr = req.Srvaddr
+	if len(req.Srvaddr) > 0 && req.Srvaddr[0] == ':' {
+		tcpcli.SrvAddr = fmt.Sprintf("%s%s", c.svrAddr.IP.To4().String(), req.Srvaddr)
+	}
 
 	go tcpcli.DoProxy()
 	return nil

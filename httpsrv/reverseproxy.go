@@ -1,7 +1,7 @@
 package httpsrv
 
 import (
-	"fmt"
+	//	"fmt"
 	"io"
 	"log"
 	"net"
@@ -221,12 +221,13 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	if res.StatusCode >= 300 && res.StatusCode < 400 {
 		for k, v := range res.Header {
-			fmt.Println(k, v)
 			if strings.Contains(k, "Location") {
 				for idx, av := range v {
-					nurl, bdo := p.DoLocation(av)
-					if bdo {
-						res.Header[k][idx] = nurl
+					if p.DoLocation != nil {
+						nurl, bdo := p.DoLocation(av)
+						if bdo {
+							res.Header[k][idx] = nurl
+						}
 					}
 				}
 			}
