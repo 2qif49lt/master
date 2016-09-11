@@ -108,7 +108,7 @@ func (c *Client) SendAlive() error {
 
 	_, err := c.SendData(data)
 
-	logrus.WithTryJson(req).Infoln("SendAlive")
+	//	logrus.WithTryJson(req).Infoln("SendAlive")
 
 	return err
 }
@@ -132,7 +132,7 @@ func (c *Client) handleAliveRsp(cmd int, body []byte, tarAddr *net.UDPAddr) erro
 		c.lock.Unlock()
 	}
 
-	logrus.WithTryJson(rsp).Infoln("handleAliveRsp")
+	//	logrus.WithTryJson(rsp).Infoln("handleAliveRsp")
 
 	return nil
 }

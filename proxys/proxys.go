@@ -66,7 +66,7 @@ func (ps *Proxys) PushProxyReverseConnChan(id, connid string, conn *net.TCPConn)
 		if pr.id == id {
 			if pc, ok := pr.conns[connid]; ok {
 				if time.Since(pc.reqTime) > time.Second*15 {
-					return log.Errorf("PushProxyReverseConnChan connection wait timeout,id: %s;connid: %s", id, connid)
+					return fmt.Errorf("PushProxyReverseConnChan connection wait timeout,id: %s;connid: %s", id, connid)
 				}
 				pc.cliconn <- conn
 				return nil
@@ -89,8 +89,7 @@ func (ps *Proxys) GetProxyReverseConnChan(name, connid string) (chan *net.TCPCon
 				if time.Since(pc.reqTime) > time.Second*15 {
 					return nil, fmt.Errorf("connection wait timeout,name: %s;connid: %s", name, connid)
 				}
-				// delete it after been taken
-				delete(pr.conns, connid)
+				//	delete(pr.conns, connid)
 				return pc.cliconn, nil
 			} else {
 				return nil, fmt.Errorf("connection is invalid,name: %s;connid: %s", name, connid)
@@ -103,14 +102,13 @@ func (ps *Proxys) CheckNewConnPushRsp(id, connid string) error {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
 
-	fmt.Println(id, connid)
 	for e := ps.proxys.Front(); e != nil; e = e.Next() {
 		pr := e.Value.(*proxy)
-
 		if pr.id == id {
 			if pc, ok := pr.conns[connid]; ok {
-				fmt.Println(pc)
-				return nil
+				if time.Since(pc.reqTime) <= time.Second*15 {
+					return nil
+				}
 			}
 
 		}
@@ -290,7 +288,7 @@ func (ps *Proxys) DoCmdAliveReq(cmd int, body []byte, sender Sender, recvTime ti
 		}).Warnln("proto unmarshal fail.")
 		return false
 	}
-	logrus.WithTryJson(req).Infoln("DoCmdAliveReq")
+	//	logrus.WithTryJson(req).Infoln("DoCmdAliveReq")
 
 	exist := false
 	ps.lock.Lock()
@@ -342,7 +340,7 @@ func (ps *Proxys) DoCmdAliveReq(cmd int, body []byte, sender Sender, recvTime ti
 		}).Warnln("Send fail.")
 		return false
 	}
-	logrus.WithTryJson(rsp).Infoln("DoCmdAliveReq")
+	//	logrus.WithTryJson(rsp).Infoln("DoCmdAliveReq")
 	return true
 }
 
