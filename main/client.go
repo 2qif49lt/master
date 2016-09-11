@@ -29,7 +29,7 @@ func main() {
 	cli := udpcli.New()
 	cli.Name = proxyName
 
-	err := cli.SetSrv("127.0.0.1:8898")
+	err := cli.SetSrv("198.199.118.214:8898")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

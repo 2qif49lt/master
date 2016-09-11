@@ -101,7 +101,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// already done outside
 		r.URL.Scheme = "http"
 		r.Host = "127.0.0.1"
-
+		r.URL.Host = r.Host
 	}
 
 	connid, e := h.ps.SendNewConnPushReqWithAutoRandId(subDomain, h.tcpAddr, 80)

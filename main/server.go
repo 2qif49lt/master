@@ -13,7 +13,7 @@ func main() {
 	ps := proxys.New()
 	ps.Udpsender = udpSrv
 	udpSrv.SetHander(&udpsrv.MsgHandler{ps})
-	go httpsrv.RunOn(":9090", ps, "127.0.0.1:7898")
+	go httpsrv.RunOn(":9090", ps, "198.199.118.214:7898")
 	tcpSrv := tcpsrv.New(ps)
 	go tcpSrv.RunOn(":7898")
 	err := udpSrv.RunOn(":8898")
